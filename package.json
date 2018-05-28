@@ -1,0 +1,39 @@
+{
+  "name": "njp-framed",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "generate-thumbnails": "./bin/generate-thumbnails",
+    "debug": "node --inspect-brk ./bin/generate-thumbnails"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/njpanderson/generate-thumbnails.git"
+  },
+  "bin": {
+    "framed": "./bin/framed"
+  },
+  "dependencies": {
+    "boxen": "^1.3.0",
+    "chalk": "^2.4.1",
+    "command-line-args": "^5.0.2",
+    "command-line-usage": "^5.0.5",
+    "css-loader": "^0.28.11",
+    "fluent-ffmpeg": "^2.1.2",
+    "glob": "^7.1.2",
+    "handlebars": "^4.0.11",
+    "jquery": "^3.3.1",
+    "merge-options": "^1.0.1",
+    "mime-types": "^2.1.18",
+    "node-sass": "^4.9.0",
+    "node-sass-utils": "^1.1.2",
+    "sass-loader": "^7.0.1",
+    "sharp": "^0.20.2",
+    "style-loader": "^0.21.0",
+    "webpack": "^4.9.1"
+  },
+  "devDependencies": {
+    "eslint": "^4.19.1"
+  }
+}

@@ -1,0 +1,25 @@
+body,
+p {
+	line-height: 140%;
+	font-family: 'Helvetica Neue', Helvetica, sans-serif;
+}
+
+a {
+	text-decoration: none;
+	color: $ui-color-text;
+}
+
+button {
+	font-size: .75rem;
+
+	.icon {
+		width: 12px;
+		height: 12px;
+	}
+}
+
+.icon {
+	width: 16px;
+	height: 16px;
+	vertical-align: middle;
+}

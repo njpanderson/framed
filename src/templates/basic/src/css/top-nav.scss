@@ -1,0 +1,10 @@
+.top-nav {
+	position: fixed;
+	z-index: 21;
+	left: 6px;
+	top: 6px;
+
+	body.gallery--hud &--show-hud {
+		display: none;
+	}
+}
