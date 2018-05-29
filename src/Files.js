@@ -72,28 +72,56 @@ class Files extends BaseApplication {
 	copyFileToOutput(file) {
 		return new Promise((resolve, reject) => {
 			let dest = this.options.fullDir + file.filename.replace(this.options.src, ''),
-				newFile;
+				newFile, done, destExists, src;
 
 			this.makeDir(path.dirname(dest));
 
+			try {
+				destExists = fs.lstatSync(dest);
+			} catch(e) {
+				destExists = false;
+			}
+
 			if (
 				this.cache.cachedWithProp(file, 'full', true) &&
-				fs.existsSync(dest)
+				destExists
 			) {
 				return resolve(new File(dest));
 			}
 
-			this.setProgress('Copying to output', file);
-
-			fs.copyFile(file.filename, dest, (error) => {
+			done = (error) => {
 				if (error) {
 					return reject(error);
 				}
 
 				this.cache.add(file, 'full', true);
+				resolve(new File(file.filename, this.makeRelative(dest)));
+			};
 
-				resolve(new File(dest));
-			});
+			if (destExists) {
+				fs.unlinkSync(dest);
+			}
+
+			// Either copy or symlink the file
+			if (this.options.linkCopies) {
+				if (this.options.linkBase) {
+					src = file.filename.replace(this.options.src + path.sep, this.options.linkBase);
+				} else {
+					src = file.filename;
+				}
+
+				this.setProgress('Linking to output', src);
+
+				fs.symlink(
+					src,
+					dest,
+					done
+				);
+			} else {
+				this.setProgress('Copying to output', file);
+
+				fs.copyFile(file.filename, dest, done)
+			}
 		});
 	}
 
@@ -103,8 +131,8 @@ class Files extends BaseApplication {
 		parts.reduce((acc, val) => {
 			acc += path.sep + val;
 
-			if (!fs.existsSync(dir)) {
-				fs.mkdirSync(dir);
+			if (!fs.existsSync(acc)) {
+				fs.mkdirSync(acc);
 			}
 
 			return acc;

@@ -12,6 +12,7 @@ const Files = require('./Files');
 const Template = require('./templates/Index');
 const Thumbnails = require('./Thumbnails');
 const Cache = require('./Cache');
+const BaseFile = require('./BaseFile');
 
 class CLI extends BaseApplication {
 	init() {
@@ -47,6 +48,16 @@ class CLI extends BaseApplication {
 			defaultValue: false,
 			alias: 'c',
 			description: 'Copies files to the output directory.'
+		}, {
+			name: 'link-copies',
+			type: Boolean,
+			defaultValue: false,
+			description: 'Links copies of files instead of copying them.'
+		}, {
+			name: 'link-base',
+			type: String,
+			defaultValue: '',
+			description: 'Set the symlink base path (instead of being computed by the source path).'
 		}, {
 			name: 'width',
 			type: Number,
@@ -85,18 +96,18 @@ class CLI extends BaseApplication {
 
 		this.files = new Files(
 			this.options,
-			this.copyProgressCallback.bind(this),
+			this.dataProgressCallback.bind(this),
 			this.cache
 		);
 
 		this.template = new Template(
 			this.options,
-			this.templateProgressCallback.bind(this)
+			this.dataProgressCallback.bind(this)
 		);
 
 		this.thumbnails = new Thumbnails(
 			this.options,
-			this.thumbnailProgressCallback.bind(this),
+			this.dataProgressCallback.bind(this),
 			this.cache
 		);
 
@@ -130,16 +141,16 @@ class CLI extends BaseApplication {
 		}
 	}
 
-	copyProgressCallback(state, message) {
-		this.write(`${state.message}: ${chalk.yellow(state.file.filename)}`);
+	dataProgressCallback(message, data) {
+		if (data instanceof BaseFile) {
+			this.write(`${message}: ${chalk.yellow(data.filename)}`);
+		} else {
+			this.stringProgressCallback(message, data);
+		}
 	}
 
-	thumbnailProgressCallback(state, message) {
-		this.write(`${state.message}: ${chalk.yellow(state.file.filename)}`);
-	}
-
-	templateProgressCallback(state) {
-		this.write(`${state.message}: ${chalk.blue(state.file.filename)}`);
+	stringProgressCallback(message, data) {
+		this.write(`${message}: ${chalk.yellow(data)}`);
 	}
 
 	printUsage() {

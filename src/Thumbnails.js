@@ -31,6 +31,7 @@ class Thumbnails extends BaseApplication {
 		let tasks = [];
 
 		files.forEach((file) => {
+			// Generate a hashed thumbnail file and add its filename to the BaseFile object.
 			if (file instanceof File) {
 				switch (file.mimeType) {
 					case 'image/jpeg':
@@ -104,6 +105,8 @@ class Thumbnails extends BaseApplication {
 				reject('file is not an instance of File');
 			}
 
+			console.log(file, outputFile);
+
 			if (
 				this.cache.cachedWithProp(file, 'thumb', true) &&
 				fs.existsSync(outputFile)
@@ -118,7 +121,8 @@ class Thumbnails extends BaseApplication {
 				.resize(this.options.width, this.options.height)
 				.max()
 				.toFile(outputFile)
-				.then(() => resolve(outputFile));
+				.then(() => resolve(outputFile))
+				.catch(reject);
 		});
 	}
 

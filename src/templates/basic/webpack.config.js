@@ -9,7 +9,7 @@ module.exports = (options) => {
 			rules: [{
 				test: /\.scss$/,
 				use: [{
-					loader: 'style-loader', // creates style nodes from JS strings
+					loader: 'style-loader',
 				}, {
 					loader: 'css-loader',
 					options: {

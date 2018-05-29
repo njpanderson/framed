@@ -5,8 +5,10 @@ const mime = require('mime-types');
 const BaseFile = require('./BaseFile');
 
 class File extends BaseFile {
-	constructor(file) {
+	constructor(file, href) {
 		super(file);
+
+		this.href = href || null;
 		this.extension = path.extname(file);
 		this.mimeType = mime.lookup(file);
 		this.thumbnailFilename = '';

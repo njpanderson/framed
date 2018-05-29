@@ -33,10 +33,18 @@ class Template extends BaseApplication {
 					config.entry = path.resolve(this.options.template + path.sep + config.entry);
 				}
 
-				config.output = {
-					filename: jsFilename,
-					path: this.options.output
-				};
+				config = Object.assign(config, {
+					output: {
+						filename: jsFilename,
+						path: this.options.output
+					},
+					resolve: {
+						modules: [
+							path.resolve(__dirname, "../../node_modules"),
+							'node_modules'
+						]
+					}
+				});
 
 				this.manifest.script = jsFilename;
 
@@ -77,7 +85,7 @@ class Template extends BaseApplication {
 				// Add files to a template list
 				data.items.push(new Item(
 					'file',
-					this.makeRelative(file.filename),
+					file.href || this.makeRelative(file.filename),
 					file.basename,
 					this.getThumb(file),
 					file.mimeType
@@ -147,9 +155,7 @@ class Template extends BaseApplication {
 	}
 
 	save(content, filename) {
-		this.setProgress('Generating template', {
-			filename
-		});
+		this.setProgress('Generating template', filename);
 
 		fs.writeFileSync(this.options.output + path.sep + filename, content, {
 			encoding: 'UTF-8'
@@ -185,10 +191,6 @@ class Template extends BaseApplication {
 				throw new Error(`Template file "${file}" not found within template path`);
 			}
 		});
-	}
-
-	makeRelative(filename) {
-		return filename.replace(this.options.output + path.sep, '');
 	}
 }
 

@@ -1,5 +1,6 @@
 const os = require('os');
 const chalk = require('chalk');
+const path = require('path');
 
 class BaseApplication {
 	constructor(options, progressCallback = null) {
@@ -20,12 +21,9 @@ class BaseApplication {
 		process.stdout.write(message + (newline ? os.EOL : '\0'));
 	}
 
-	setProgress(message, file) {
-		if (this.progressCallback) {
-			this.progressCallback({
-				message,
-				file
-			});
+	setProgress(message, data) {
+		if (typeof this.progressCallback === 'function') {
+			this.progressCallback(message, data);
 		}
 	}
 
@@ -47,6 +45,10 @@ class BaseApplication {
 			shuffled[a] = temp;
 		}
 		return shuffled.slice(0, size);
+	}
+
+	makeRelative(filename) {
+		return filename.replace(this.options.output + path.sep, '');
 	}
 }
 
