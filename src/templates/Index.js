@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const util = require('util');
+const chalk = require('chalk');
 const Handlebars = require('handlebars');
 const webpack = require('webpack');
 
@@ -20,6 +21,8 @@ class Template extends BaseApplication {
 	}
 
 	build(files) {
+		this.write(chalk.blue('Building templates...'));
+
 		return new Promise((resolve, reject) => {
 			let webpackConfigFilename = this.options.template + path.sep + 'webpack.config.js',
 				jsFilename = 'bundle.js',

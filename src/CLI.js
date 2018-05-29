@@ -13,6 +13,7 @@ const Template = require('./templates/Index');
 const Thumbnails = require('./Thumbnails');
 const Cache = require('./Cache');
 const BaseFile = require('./BaseFile');
+const Directory = require('./Directory');
 
 class CLI extends BaseApplication {
 	init() {
@@ -71,11 +72,21 @@ class CLI extends BaseApplication {
 			alias: 't',
 			defaultValue: `${__dirname}${path.sep}templates${path.sep}basic`,
 			description: 'Defines a path for the gallery template.'
+		}, {
+			name: 'verbose',
+			type: Boolean,
+			alias: 'v',
+			defaultValue: false,
+			description: 'Produces more output data.'
 		}];
 
 		this.options = Object.assign(this.options, commandLineArgs(this.optionDefs, {
 			camelCase: true
 		}));
+
+		// Sanity check options
+		this.options.output = this.options.output.replace(/\/$/, '');
+		this.options.src = this.options.src.replace(/\/$/, '');
 
 		// Set composite options
 		this.options.thumbsDir = `${this.options.output}${path.sep}${this.options.thumbsDirName}`;
@@ -108,10 +119,15 @@ class CLI extends BaseApplication {
 
 		this.prepareOutputDir();
 
+		this.write(chalk.blue('Finding files...'));
+
 		this.files.find(
 			this.options.src
 		)
-			.then(this.thumbnails.generate)
+			.then((files) => {
+				this.write(`${chalk.green(this.getFileCount(files))} file(s) found.`);
+				return this.thumbnails.generate(files);
+			})
 			.then(this.template.build)
 			.then(() => {
 				this.cache.save();
@@ -138,15 +154,19 @@ class CLI extends BaseApplication {
 	}
 
 	dataProgressCallback(message, data) {
-		if (data instanceof BaseFile) {
-			this.write(`${message}: ${chalk.yellow(data.filename)}`);
-		} else {
-			this.stringProgressCallback(message, data);
+		if (this.options.verbose) {
+			if (data instanceof BaseFile) {
+				this.write(`${message}: ${chalk.yellow(data.filename)}`);
+			} else {
+				this.stringProgressCallback(message, data);
+			}
 		}
 	}
 
 	stringProgressCallback(message, data) {
-		this.write(`${message}: ${chalk.yellow(data)}`);
+		if (this.options.verbose) {
+			this.write(`${message}: ${chalk.yellow(data)}`);
+		}
 	}
 
 	printUsage() {
@@ -172,6 +192,22 @@ class CLI extends BaseApplication {
 
 		const usage = commandLineUsage(sections)
 		this.write(usage);
+	}
+
+	/**
+	 * Counts all the files within an array.
+	 * @param {Array} files - Files to count.
+	 */
+	getFileCount(files) {
+		return files.reduce((count, file) => {
+			count += 1;
+
+			if (file instanceof Directory) {
+				count += this.getFileCount(file.children);
+			}
+
+			return count;
+		}, 0);
 	}
 }
 

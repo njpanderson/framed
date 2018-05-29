@@ -1,6 +1,8 @@
 const glob = require('glob');
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
+const chalk = require('chalk');
 
 const File = require('./File');
 const Directory = require('./Directory');
@@ -23,6 +25,7 @@ class Files extends BaseApplication {
 		let result = [],
 			tasks = [];
 
+		this.fileCount = 0;
 		this.prepareFullDir();
 
 		return new Promise((resolve, reject) => {

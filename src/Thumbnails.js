@@ -1,6 +1,7 @@
 const fs = require('fs');
 const util = require('util');
 const path = require('path');
+const chalk = require('chalk');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 
@@ -18,50 +19,90 @@ class Thumbnails extends BaseApplication {
 	}
 
 	generate(files) {
+		this.write(chalk.blue('Generating thumbnails...'));
+
+		this.counts = {
+			cached: 0,
+			processed: 0
+		};
+
 		this.prepareThumbDir();
 
 		return this.runTasksInSerial(this.populateTasks(files))
-			.then((result) => {
-				return result;
+			.then(() => {
+				this.write(
+					`${chalk.green(this.counts.processed)} thumbnail(s) generated ` +
+					`(${chalk.green(this.counts.cached)} thumbnail(s) cached).`
+				);
+
+				return files;
 			});
 	}
 
 	populateTasks(files) {
-		let tasks = [];
+		let tasks = [],
+			counts, outputFile;
 
 		files.forEach((file) => {
 			// Generate a hashed thumbnail file and add its filename to the BaseFile object.
+			let outputFile;
+
 			if (file instanceof File) {
 				switch (file.mimeType) {
 					case 'image/jpeg':
 					case 'image/png':
-						tasks.push(() => {
-							return this.generateImageThumbnail(
-								file,
-								this.options.thumbsDir + path.sep +
-									file.hash + file.extension
-							).then((thumbnailFilename) => {
-								file.thumbnailFilename = thumbnailFilename;
-								this.cache.add(file, 'thumb', true);
-								return file;
+						outputFile = this.getOutputFile(
+							file,
+							this.options.thumbsDir + path.sep +
+								file.hash + file.extension
+						);
+
+						if (!outputFile.cached) {
+							tasks.push(() => {
+								return this.generateImageThumbnail(
+									file,
+									outputFile.filename
+								).then((thumbnailFilename) => {
+									file.thumbnailFilename = thumbnailFilename;
+									this.cache.add(file, 'thumb', true);
+									this.counts.processed += 1;
+									return file;
+								});
 							});
-						});
+						} else {
+							this.counts.cached += 1;
+							file.thumbnailFilename = outputFile.filename;
+						}
+
 						break;
 
 					case 'video/mp4':
 					case 'video/quicktime':
 					case 'video/ogg':
 					case 'video/webm':
-						tasks.push(() => {
-							return this.generateVideoThumbnail(
-								file,
-								this.options.thumbsDir
-							).then((thumbnailFilename) => {
-								file.thumbnailFilename = thumbnailFilename;
-								this.cache.add(file, 'thumb', true);
-								return file;
-							})
-						});
+						outputFile = this.getOutputFile(
+							file,
+							this.options.thumbsDir + path.sep +
+								file.hash + '.jpg'
+						);
+
+						if (!outputFile.cached) {
+							tasks.push(() => {
+								return this.generateVideoThumbnail(
+									file,
+									outputFile.filename
+								).then((thumbnailFilename) => {
+									file.thumbnailFilename = thumbnailFilename;
+									this.cache.add(file, 'thumb', true);
+									this.counts.processed += 1;
+									return file;
+								})
+							});
+						} else {
+							this.counts.cached += 1;
+							file.thumbnailFilename = outputFile.filename;
+						}
+
 						break;
 
 					default:
@@ -83,6 +124,16 @@ class Thumbnails extends BaseApplication {
 		return tasks;
 	}
 
+	getOutputFile(file, outputFile) {
+		return {
+			cached: (
+				this.cache.cachedWithProp(file, 'thumb', true) &&
+				fs.existsSync(outputFile)
+			),
+			filename: outputFile
+		};
+	}
+
 	prepareThumbDir() {
 		// Attempt to create thumbs directory
 		try {
@@ -100,14 +151,6 @@ class Thumbnails extends BaseApplication {
 				reject('file is not an instance of File');
 			}
 
-			if (
-				this.cache.cachedWithProp(file, 'thumb', true) &&
-				fs.existsSync(outputFile)
-			) {
-				// Cache exists (and is newer) and the file exists
-				return resolve(outputFile);
-			}
-
 			this.setProgress('Creating image thumbnail', file);
 
 			sharp(file.filename)
@@ -119,18 +162,8 @@ class Thumbnails extends BaseApplication {
 		});
 	}
 
-	generateVideoThumbnail(file, outputDir) {
+	generateVideoThumbnail(file, outputFile) {
 		return new Promise((resolve, reject) => {
-			let outputFile = this.options.thumbsDir + path.sep + file.hash + '.jpg';
-
-			if (
-				this.cache.cachedWithProp(file, 'thumb', true) &&
-				fs.existsSync(outputFile)
-			) {
-				// Cache exists (and is newer) and the file exists
-				return resolve(outputFile);
-			}
-
 			this.setProgress('Creating video thumbnail', file);
 
 			ffmpeg(file.filename)

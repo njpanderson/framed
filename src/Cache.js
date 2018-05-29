@@ -51,7 +51,7 @@ class Cache {
 	 * Tests if a cache entry for the BaseFile file exists.
 	 * @param {object} file
 	 */
-	cached(file, newOnly = true) {
+	cached(file) {
 		return this.cache.files[file.hash] || false;
 	}
 
@@ -59,20 +59,16 @@ class Cache {
 	 * Tests if a cache entry for the BaseFile file exists with a specific property.
 	 * @param {object} file
 	 * @param {string} prop
-	 * @param {*} value
-	 * @param {boolean} newOnly
+	 * @param {string|array|object|number} value
 	 */
-	cachedWithProp(file, prop, value, newOnly = true) {
+	cachedWithProp(file, prop, value) {
 		let cache;
 
 		if (
 			(cache = this.cached(file)) &&
 			cache[prop] &&
 			cache[prop].value === value &&
-			(
-				(newOnly && cache[prop].mtimeMs <= file.mtimeMs) ||
-				!newOnly
-			)
+			cache[prop].mtimeMs >= file.mtimeMs
 		) {
 			return true;
 		}
