@@ -271,7 +271,6 @@ class GalleryDOM {
 
 		newHeight = (currentHeight + (currentHeight / 100) * percentageAdjust);
 
-		console.log(percentageAdjust, currentHeight, newHeight);
 		$video.css({
 			height: newHeight + 'px'
 		});

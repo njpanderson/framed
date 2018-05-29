@@ -1,3 +1,4 @@
+const util = require('util');
 const fs = require('fs');
 const path = require('path');
 
@@ -34,9 +35,9 @@ class Cache {
 	}
 
 	add(file, prop, value) {
-		this.cache.files[file.hash] = {
-			mtimeMs: file.mtimeMs
-		};
+		if (!this.cache.files[file.hash]) {
+			this.cache.files[file.hash] = {};
+		}
 
 		if (prop) {
 			this.cache.files[file.hash][prop] = {
@@ -49,20 +50,9 @@ class Cache {
 	/**
 	 * Tests if a cache entry for the BaseFile file exists.
 	 * @param {object} file
-	 * @param {boolean} newOnly
 	 */
 	cached(file, newOnly = true) {
-		if (
-			this.cache.files[file.hash] &&
-			(
-				(newOnly && this.cache.files[file.hash].mtimeMs < Date.now()) ||
-				!newOnly
-			)
-		) {
-			return true;
-		}
-
-		return false;
+		return this.cache.files[file.hash] || false;
 	}
 
 	/**
@@ -73,12 +63,14 @@ class Cache {
 	 * @param {boolean} newOnly
 	 */
 	cachedWithProp(file, prop, value, newOnly = true) {
+		let cache;
+
 		if (
-			this.cached(file, newOnly) &&
-			this.cache.files[file.hash][prop] &&
-			this.cache.files[file.hash][prop].value === value &&
+			(cache = this.cached(file)) &&
+			cache[prop] &&
+			cache[prop].value === value &&
 			(
-				(newOnly && this.cache.files[file.hash][prop].mtimeMs < Date.now()) ||
+				(newOnly && cache[prop].mtimeMs <= file.mtimeMs) ||
 				!newOnly
 			)
 		) {

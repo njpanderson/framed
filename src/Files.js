@@ -10,6 +10,11 @@ class Files extends BaseApplication {
 	constructor(options, progressCallback, cache) {
 		super(options);
 
+		if (this.options.runJs) {
+			// Get JS script from include
+			this.jsRunner = require(path.resolve(this.options.runJs));
+		}
+
 		this.cache = cache;
 		this.progressCallback = progressCallback;
 	}
@@ -30,23 +35,25 @@ class Files extends BaseApplication {
 					let stat = fs.statSync(file);
 
 					if (stat.isDirectory()) {
-						tasks.push(this.find(file).then(subResult =>
+						tasks.push(() => this.find(file).then(subResult =>
 							result.push(new Directory(file, subResult))
 						));
 					} else {
 						if (this.options.copyFiles) {
 							// Copy files to output directory
-							tasks.push(
-								this.copyFileToOutput(new File(file))
-									.then(file => result.push(file))
-							);
+							tasks.push(() => {
+								return this.copyFileToOutput(new File(file))
+									.then(file => {
+										result.push(file);
+									})
+							});
 						} else {
 							result.push(new File(file));
 						}
 					}
 				});
 
-				Promise.all(tasks)
+				this.runTasksInSerial(tasks)
 					.then(() => {
 						resolve(result)
 					});
@@ -72,7 +79,7 @@ class Files extends BaseApplication {
 	copyFileToOutput(file) {
 		return new Promise((resolve, reject) => {
 			let dest = this.options.fullDir + file.filename.replace(this.options.src, ''),
-				newFile, done, destExists, src;
+				newFile, done, destExists;
 
 			this.makeDir(path.dirname(dest));
 
@@ -82,45 +89,60 @@ class Files extends BaseApplication {
 				destExists = false;
 			}
 
-			if (
-				this.cache.cachedWithProp(file, 'full', true) &&
-				destExists
-			) {
-				return resolve(new File(dest));
-			}
-
 			done = (error) => {
 				if (error) {
 					return reject(error);
 				}
 
 				this.cache.add(file, 'full', true);
+
 				resolve(new File(file.filename, this.makeRelative(dest)));
 			};
 
-			if (destExists) {
-				fs.unlinkSync(dest);
-			}
+			// Either copy or run JS on the file
+			if (this.jsRunner) {
+				this.runJs('read', file.filename, dest)
+					.then((result) => {
+						if (this.cache.cachedWithProp(file, 'full', true) && result === true) {
+							return done();
+						}
 
-			// Either copy or symlink the file
-			if (this.options.linkCopies) {
-				if (this.options.linkBase) {
-					src = file.filename.replace(this.options.src + path.sep, this.options.linkBase);
-				} else {
-					src = file.filename;
+						this.setProgress('Running script', file);
+
+						return this.runJs('write', file.filename, dest)
+							.then(done)
+							.catch(this.writeError.bind(this));
+					});
+			} else {
+				if (this.cache.cachedWithProp(file, 'full', true) && destExists) {
+					return done();
 				}
 
-				this.setProgress('Linking to output', src);
-
-				fs.symlink(
-					src,
-					dest,
-					done
-				);
-			} else {
 				this.setProgress('Copying to output', file);
 
-				fs.copyFile(file.filename, dest, done)
+				if (destExists) {
+					fs.unlinkSync(dest);
+				}
+
+				fs.copyFile(file.filename, dest, done);
+			}
+		});
+	}
+
+	runJs(method, src, dest) {
+		return new Promise((resolve, reject) => {
+			let result;
+
+			if (typeof this.jsRunner[method] === 'function') {
+				result = this.jsRunner[method].apply(this, [...arguments].slice(1));
+
+				if (result instanceof Promise) {
+					result.then(resolve).catch(reject);
+				} else {
+					reject(result);
+				}
+			} else {
+				reject(`JS Runner must return an Object with the method "${method}".`);
 			}
 		});
 	}

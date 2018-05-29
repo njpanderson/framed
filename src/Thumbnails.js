@@ -18,13 +18,12 @@ class Thumbnails extends BaseApplication {
 	}
 
 	generate(files) {
-		return new Promise((resolve, reject) => {
-			this.prepareThumbDir();
+		this.prepareThumbDir();
 
-			this.runTasks(this.populateTasks(files), () => {
-				resolve(files);
+		return this.runTasksInSerial(this.populateTasks(files))
+			.then((result) => {
+				return result;
 			});
-		});
 	}
 
 	populateTasks(files) {
@@ -43,7 +42,8 @@ class Thumbnails extends BaseApplication {
 									file.hash + file.extension
 							).then((thumbnailFilename) => {
 								file.thumbnailFilename = thumbnailFilename;
-								this.cache.add(file);
+								this.cache.add(file, 'thumb', true);
+								return file;
 							});
 						});
 						break;
@@ -59,12 +59,16 @@ class Thumbnails extends BaseApplication {
 							).then((thumbnailFilename) => {
 								file.thumbnailFilename = thumbnailFilename;
 								this.cache.add(file, 'thumb', true);
+								return file;
 							})
 						});
 						break;
 
 					default:
-						this.writeError(`Format ${file.mimeType} not supported. Thumb for ${file.filename} not generated.`);
+						this.writeError(
+							`Format ${file.mimeType} not supported. ` +
+							`Thumb for ${file.filename} not generated.`
+						);
 
 
 
@@ -77,15 +81,6 @@ class Thumbnails extends BaseApplication {
 		});
 
 		return tasks;
-	}
-
-	runTasks(tasks, callback) {
-		if (tasks.length) {
-			return tasks.shift().apply(this)
-				.then(() => this.runTasks(tasks, callback));
-		}
-
-		return callback.apply(this);
 	}
 
 	prepareThumbDir() {
@@ -104,8 +99,6 @@ class Thumbnails extends BaseApplication {
 			if (!(file instanceof File)) {
 				reject('file is not an instance of File');
 			}
-
-			console.log(file, outputFile);
 
 			if (
 				this.cache.cachedWithProp(file, 'thumb', true) &&
@@ -131,7 +124,7 @@ class Thumbnails extends BaseApplication {
 			let outputFile = this.options.thumbsDir + path.sep + file.hash + '.jpg';
 
 			if (
-				this.cache.cached(file, 'thumb', true) &&
+				this.cache.cachedWithProp(file, 'thumb', true) &&
 				fs.existsSync(outputFile)
 			) {
 				// Cache exists (and is newer) and the file exists

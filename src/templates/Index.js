@@ -51,7 +51,7 @@ class Template extends BaseApplication {
 				webpack(config, (error, stats) => {
 					if (error || stats.hasErrors()) {
 						if (stats.hasErrors()) {
-							console.log(stats.toJson('minimal'));
+							this.write(stats.toJson('minimal'));
 						}
 						reject('Error compiling webpack config');
 					}

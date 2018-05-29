@@ -37,7 +37,6 @@ class Gallery {
 	 * Open the gallery with a single resource
 	 */
 	open(url) {
-		console.log('open', url);
 		this.addAsset(this.getAssetByUrl(this.assets, url));
 		this.setState({ active: true });
 	}
@@ -50,8 +49,6 @@ class Gallery {
 		let state = this.getState();
 
 		if (state.active) {
-			console.log('keyPress', key, code, ctrl);
-
 			if (!isNaN(key) && (key = parseInt(key, 10))) {
 				// Numbers 0-9 pressed
 				if (!ctrl && key <= this.options.absoluteMaxAssetCount) {
@@ -177,7 +174,6 @@ class Gallery {
 	}
 
 	setState(state) {
-		console.log('setState', mergeOptions({}, this._state));
 		let prevState = mergeOptions({}, this._state);
 		this._state = mergeOptions({}, this._state, state);
 		this.render(prevState, mergeOptions({}, this._state));
@@ -194,8 +190,6 @@ class Gallery {
 	render(prevState, newState, force) {
 		let a;
 
-		console.log('render', mergeOptions({}, prevState), mergeOptions({}, newState));
-
 		// Update active status
 		if (newState.active !== prevState.active) {
 			this.dom[newState.active ? 'open' : 'close']();
@@ -206,7 +200,6 @@ class Gallery {
 
 		// Update asset display
 		if (!this.isJSONEqual(prevState.shown, newState.shown) || force) {
-			console.log('Updating asset display');
 			this.dom.$content.empty();
 
 			for (a = 0; a < newState.shown.length; a += 1) {

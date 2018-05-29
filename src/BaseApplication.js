@@ -8,8 +8,12 @@ class BaseApplication {
 		this.progressCallback = progressCallback;
 	}
 
-	writeError(message) {
-		this.write(chalk.red('Error:') + ' ' + message);
+	writeError(error) {
+		if (error instanceof Error) {
+			this.write(chalk.red('Error:') + ' ' + error.message);
+		} else {
+			this.write(chalk.red('Error:') + ' ' + error);
+		}
 	}
 
 	/**
@@ -49,6 +53,27 @@ class BaseApplication {
 
 	makeRelative(filename) {
 		return filename.replace(this.options.output + path.sep, '');
+	}
+
+	runTasksInSerial(tasks) {
+		return new Promise((resolve, reject) => {
+			let results = [];
+
+			const runner = function() {
+				if (tasks.length) {
+					(tasks.shift()).call(this)
+						.then((result) => {
+							results.push(result);
+							runner();
+						})
+						.catch(reject)
+				} else {
+					resolve(results);
+				}
+			};
+
+			runner();
+		});
 	}
 }
 

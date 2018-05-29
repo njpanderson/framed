@@ -49,15 +49,10 @@ class CLI extends BaseApplication {
 			alias: 'c',
 			description: 'Copies files to the output directory.'
 		}, {
-			name: 'link-copies',
-			type: Boolean,
-			defaultValue: false,
-			description: 'Links copies of files instead of copying them.'
-		}, {
-			name: 'link-base',
+			name: 'run-js',
 			type: String,
 			defaultValue: '',
-			description: 'Set the symlink base path (instead of being computed by the source path).'
+			description: 'Run a JS script on each file during collection.'
 		}, {
 			name: 'width',
 			type: Number,
@@ -123,6 +118,7 @@ class CLI extends BaseApplication {
 			})
 			.then(() => {
 				this.write(chalk.green('Done!'));
+				process.exit();
 			});
 	}
 

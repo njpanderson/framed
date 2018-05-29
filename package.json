@@ -4,12 +4,12 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "generate-thumbnails": "./bin/generate-thumbnails",
-    "debug": "node --inspect-brk ./bin/generate-thumbnails"
+    "framed": "./bin/framed",
+    "debug": "node --inspect-brk ./bin/framed"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/njpanderson/generate-thumbnails.git"
+    "url": "https://github.com/njpanderson/framed.git"
   },
   "bin": {
     "framed": "./bin/framed"
