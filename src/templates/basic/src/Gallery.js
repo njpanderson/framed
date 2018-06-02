@@ -1,4 +1,4 @@
-const mergeOptions = require('merge-options');
+import mergeOptions from 'merge-options';
 import $ from "jquery";
 
 import GalleryDOM from './GalleryDOM';

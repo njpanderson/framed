@@ -2,15 +2,26 @@ const os = require('os');
 const chalk = require('chalk');
 const path = require('path');
 
+const Directory = require('./Directory');
+
 class BaseApplication {
 	constructor(options, progressCallback = null) {
 		this.options = options;
 		this.progressCallback = progressCallback;
+
+		this.taskCounts = {
+			count: 0,
+			complete: 0
+		};
 	}
 
 	writeError(error) {
 		if (error instanceof Error) {
-			this.write(chalk.red('Error:') + ' ' + error.message);
+			this.write(chalk.red(`Error: ${error.message}`));
+
+			error.code &&this.write(`${chalk.red('Code:')}: ${error.code}`);
+			error.frame &&this.write(`${chalk.red('Frame:')}: ${error.frame}`);
+			error.stack &&this.write(`${chalk.red('Stack trace:')}:\n${error.stack}`);
 		} else {
 			this.write(chalk.red('Error:') + ' ' + error);
 		}
@@ -25,9 +36,14 @@ class BaseApplication {
 		process.stdout.write(message + (newline ? os.EOL : '\0'));
 	}
 
-	setProgress(message, data) {
+	incrementProgress(item) {
+		let percentage = (100/this.taskCounts.count) * this.taskCounts.complete++;
+		this.setProgress(item, percentage);
+	}
+
+	setProgress(item, percentage) {
 		if (typeof this.progressCallback === 'function') {
-			this.progressCallback(message, data);
+			this.progressCallback(item, percentage);
 		}
 	}
 
@@ -74,6 +90,37 @@ class BaseApplication {
 
 			runner();
 		});
+	}
+
+	/**
+	 * Counts all the files within an array.
+	 * @param {Array} files - Files to count.
+	 */
+	getFileCount(files) {
+		return files.reduce((count, file) => {
+			count += 1;
+
+			if (file instanceof Directory) {
+				count += this.getFileCount(file.children);
+			}
+
+			return count;
+		}, 0);
+	}
+
+	/**
+	 * Counts all the directories within an array.
+	 * @param {Array} files - Files containing directories to count.
+	 */
+	getDirectoryCount(files) {
+		return files.reduce((count, file) => {
+			if (file instanceof Directory) {
+				count += 1;
+				count += this.getDirectoryCount(file.children);
+			}
+
+			return count;
+		}, 0);
 	}
 }
 

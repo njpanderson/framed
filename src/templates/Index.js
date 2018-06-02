@@ -3,7 +3,7 @@ const path = require('path');
 const util = require('util');
 const chalk = require('chalk');
 const Handlebars = require('handlebars');
-const webpack = require('webpack');
+const rollup = require('rollup');
 
 const File = require('../File');
 const Directory = require('../Directory');
@@ -21,51 +21,40 @@ class Template extends BaseApplication {
 	}
 
 	build(files) {
-		this.write(chalk.blue('Building templates...'));
+		// Get count of directories (templates) (including current directory)
+		this.taskCounts.count = this.getDirectoryCount(files) + 1;
 
+		// Return the promise
 		return new Promise((resolve, reject) => {
-			let webpackConfigFilename = this.options.template + path.sep + 'webpack.config.js',
+			let rollupConfigFile = this.options.template + path.sep + 'rollup.config.js',
 				jsFilename = 'bundle.js',
-				config;
+				config, compiler;
 
-			if (fs.existsSync(webpackConfigFilename)) {
-				config = require(webpackConfigFilename)(this.options);
+			if (fs.existsSync(rollupConfigFile)) {
+				config = require(rollupConfigFile)(this.options);
 
-				// Override output
-				if (typeof config.entry === 'string') {
-					config.entry = path.resolve(this.options.template + path.sep + config.entry);
+				// Override config
+				if (typeof config.inputOptions.input === 'string') {
+					config.inputOptions.input = path.resolve(
+						this.options.template + path.sep + config.inputOptions.input
+					);
 				}
 
-				config = Object.assign(config, {
-					output: {
-						filename: jsFilename,
-						path: this.options.output
-					},
-					resolve: {
-						modules: [
-							path.resolve(__dirname, "../../node_modules"),
-							'node_modules'
-						]
-					}
+				config.outputOptions = Object.assign(config.outputOptions, {
+					file: this.options.output + path.sep + jsFilename
 				});
 
 				this.manifest.script = jsFilename;
 
-				webpack(config, (error, stats) => {
-					if (error || stats.hasErrors()) {
-						if (stats.hasErrors()) {
-							this.write(stats.toJson('minimal'));
-						}
-						reject('Error compiling webpack config');
-					}
-
-					// Done processing
-					this.compile(files)
-					resolve();
-				});
+				rollup.rollup(config.inputOptions)
+					.then((bundle) => bundle.write(config.outputOptions))
+					.then(() => this.compile(files))
+					.then(resolve)
+					.catch(reject);
 			} else {
 				this.compile(files)
-				resolve();
+					.then(resolve)
+					.catch(reject);
 			}
 		});
 	}
@@ -74,6 +63,7 @@ class Template extends BaseApplication {
 		let data = {
 				"items": []
 			},
+			tasks = [],
 			template;
 
 		if (!parent) {
@@ -94,31 +84,41 @@ class Template extends BaseApplication {
 					file.mimeType
 				));
 			} else if (file instanceof Directory) {
-				// Go compile sub directories
-				this.compile(file.children, file);
-
 				data.items.push(new Item(
 					'dir',
 					file.templateFilename,
 					file.basename,
 					this.getRandomSubarray(this.getThumb(file), 10)
 				));
+
+				// Go compile sub directories
+				tasks.concat(this.compile(file.children, file));
 			}
 		});
 
-		template = Handlebars.compile(fs.readFileSync(
-			`${this.options.template}${path.sep}index.html`, {
-				encoding: 'UTF-8'
-			}
-		));
+		tasks.push(new Promise((resolve, reject) => {
+			template = Handlebars.compile(fs.readFileSync(
+				`${this.options.template}${path.sep}index.html`, {
+					encoding: 'UTF-8'
+				}
+			));
 
-		data.title = parent.basename;
-		data.script = this.manifest.script;
+			data.title = parent.basename;
+			data.script = this.manifest.script;
 
-		this.save(
-			template(this.sortData(data)),
-			parent.templateFilename
-		);
+			this.save(
+				template(this.sortData(data)),
+				parent.templateFilename
+			);
+
+			resolve();
+		}));
+
+		if (!parent) {
+			return this.runTasksInSerial(tasks);
+		} else {
+			return tasks;
+		}
 	}
 
 	getThumb(file) {
@@ -158,7 +158,7 @@ class Template extends BaseApplication {
 	}
 
 	save(content, filename) {
-		this.setProgress('Generating template', filename);
+		this.incrementProgress(filename);
 
 		fs.writeFileSync(this.options.output + path.sep + filename, content, {
 			encoding: 'UTF-8'

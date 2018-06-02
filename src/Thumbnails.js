@@ -19,24 +19,13 @@ class Thumbnails extends BaseApplication {
 	}
 
 	generate(files) {
-		this.write(chalk.blue('Generating thumbnails...'));
-
-		this.counts = {
-			cached: 0,
-			processed: 0
-		};
+		this.taskCounts.count = this.getFileCount(files);
+		this.taskCounts.cached = 0;
 
 		this.prepareThumbDir();
 
 		return this.runTasksInSerial(this.populateTasks(files))
-			.then(() => {
-				this.write(
-					`${chalk.green(this.counts.processed)} thumbnail(s) generated ` +
-					`(${chalk.green(this.counts.cached)} thumbnail(s) cached).`
-				);
-
-				return files;
-			});
+			.then(() => files);
 	}
 
 	populateTasks(files) {
@@ -65,12 +54,17 @@ class Thumbnails extends BaseApplication {
 								).then((thumbnailFilename) => {
 									file.thumbnailFilename = thumbnailFilename;
 									this.cache.add(file, 'thumb', true);
-									this.counts.processed += 1;
+									this.incrementProgress(file.filename);
+
 									return file;
+								})
+								.catch(() => {
+									this.incrementProgress(file.filename);
 								});
 							});
 						} else {
-							this.counts.cached += 1;
+							this.incrementProgress(file.filename);
+							this.taskCounts.cached += 1;
 							file.thumbnailFilename = outputFile.filename;
 						}
 
@@ -94,12 +88,17 @@ class Thumbnails extends BaseApplication {
 								).then((thumbnailFilename) => {
 									file.thumbnailFilename = thumbnailFilename;
 									this.cache.add(file, 'thumb', true);
-									this.counts.processed += 1;
+									this.incrementProgress(file.filename);
+
 									return file;
+								})
+								.catch(() => {
+									this.incrementProgress(file.filename);
 								})
 							});
 						} else {
-							this.counts.cached += 1;
+							this.incrementProgress(file.filename);
+							this.taskCounts.cached += 1;
 							file.thumbnailFilename = outputFile.filename;
 						}
 
@@ -110,9 +109,6 @@ class Thumbnails extends BaseApplication {
 							`Format ${file.mimeType} not supported. ` +
 							`Thumb for ${file.filename} not generated.`
 						);
-
-
-
 				}
 			} else if (file instanceof Directory) {
 				tasks = tasks.concat(
@@ -151,8 +147,6 @@ class Thumbnails extends BaseApplication {
 				reject('file is not an instance of File');
 			}
 
-			this.setProgress('Creating image thumbnail', file);
-
 			sharp(file.filename)
 				.resize(this.options.width, this.options.height)
 				.max()
@@ -164,14 +158,13 @@ class Thumbnails extends BaseApplication {
 
 	generateVideoThumbnail(file, outputFile) {
 		return new Promise((resolve, reject) => {
-			this.setProgress('Creating video thumbnail', file);
 
 			ffmpeg(file.filename)
 				.on('end', function() {
 					resolve(outputFile);
 				})
 				.on('error', function(err, stdout, stderr) {
-					this.writeError('Cannot process video: ' + err.message);
+					reject('Cannot process video: ' + err.message);
 				})
 				.screenshots({
 					timestamps: ['50%'],

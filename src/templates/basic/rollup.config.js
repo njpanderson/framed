@@ -1,22 +1,18 @@
-const path = require('path');
-const sass = require("node-sass");
-const sassUtils = require("node-sass-utils")(sass);
+const sass = require('rollup-plugin-sass');
+const resolve = require('rollup-plugin-node-resolve');
+const commonjs = require('rollup-plugin-commonjs');
+const nodeSass = require('node-sass');
+const sassUtils = require('node-sass-utils')(nodeSass);
 
 module.exports = (options) => {
 	return {
-		entry: 'src/main.js',
-		module: {
-			rules: [{
-				test: /\.scss$/,
-				use: [{
-					loader: 'style-loader',
-				}, {
-					loader: 'css-loader',
-					options: {
-						sourceMap: true
-					}
-				}, {
-					loader: 'sass-loader',
+		inputOptions: {
+			input: 'src/main.js',
+			plugins: [
+				resolve(),
+				commonjs(),
+				sass({
+					insert: true,
 					options: {
 						sourceMap: true,
 						functions: {
@@ -40,9 +36,11 @@ module.exports = (options) => {
 							}
 						}
 					}
-				}]
-			}]
+				})
+			]
 		},
-		devtool: 'eval-source-map'
+		outputOptions: {
+			format: 'iife'
+		}
 	};
 };

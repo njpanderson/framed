@@ -1,4 +1,4 @@
-const glob = require('glob');
+const Glob = require('glob').Glob;
 const fs = require('fs');
 const path = require('path');
 const util = require('util');
@@ -12,6 +12,10 @@ class Files extends BaseApplication {
 	constructor(options, progressCallback, cache) {
 		super(options);
 
+		this.globOptions = {
+			dot: false
+		};
+
 		if (this.options.runJs) {
 			// Get JS script from include
 			this.jsRunner = require(path.resolve(this.options.runJs));
@@ -22,23 +26,42 @@ class Files extends BaseApplication {
 	}
 
 	find(root) {
+		// Find a list all files and get a count
+		return new Promise((resolve, reject) => {
+			let glob = new Glob(`${root}/**/*`, Object.assign({}, this.globOptions, {
+				nodir: true
+			}), (error, files) => {
+				if (error) {
+					return reject(error);
+				}
+
+				this.taskCounts.count = files.length;
+
+				// Then, run the parser
+				this.parse(root, glob.cache).then(resolve, reject);
+			});
+		});
+	}
+
+	parse(root, globCache) {
 		let result = [],
 			tasks = [];
 
-		this.fileCount = 0;
 		this.prepareFullDir();
 
 		return new Promise((resolve, reject) => {
-			glob(`${root}/*`, {
-				dot: false
-			}, (error, files) => {
-				error && reject(error);
+			let glob = new Glob(`${root}/*`, Object.assign({}, this.globOptions, {
+					cache: globCache
+				}), (error, files) => {
+				if (error) {
+					return reject(error);
+				}
 
 				files.forEach(file => {
 					let stat = fs.statSync(file);
 
 					if (stat.isDirectory()) {
-						tasks.push(() => this.find(file).then(subResult =>
+						tasks.push(() => this.parse(file).then(subResult =>
 							result.push(new Directory(file, subResult))
 						));
 					} else {
@@ -47,10 +70,12 @@ class Files extends BaseApplication {
 							tasks.push(() => {
 								return this.copyFileToOutput(new File(file))
 									.then(file => {
+										this.incrementProgress(file.filename);
 										result.push(file);
 									})
 							});
 						} else {
+							this.incrementProgress(file);
 							result.push(new File(file));
 						}
 					}
@@ -110,8 +135,6 @@ class Files extends BaseApplication {
 							return done();
 						}
 
-						this.setProgress('Running script', file);
-
 						return this.runJs('write', file.filename, dest)
 							.then(done)
 							.catch(this.writeError.bind(this));
@@ -120,8 +143,6 @@ class Files extends BaseApplication {
 				if (this.cache.cachedWithProp(file, 'full', true) && destExists) {
 					return done();
 				}
-
-				this.setProgress('Copying to output', file);
 
 				if (destExists) {
 					fs.unlinkSync(dest);

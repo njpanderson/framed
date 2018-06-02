@@ -2,7 +2,6 @@ const fs = require('fs');
 const util = require('util');
 const path = require('path');
 const chalk = require('chalk');
-const boxen = require('boxen');
 const commandLineArgs = require('command-line-args');
 const commandLineUsage = require('command-line-usage');
 
@@ -12,11 +11,12 @@ const Files = require('./Files');
 const Template = require('./templates/Index');
 const Thumbnails = require('./Thumbnails');
 const Cache = require('./Cache');
-const BaseFile = require('./BaseFile');
-const Directory = require('./Directory');
+const Progress = require('./Progress');
 
 class CLI extends BaseApplication {
-	init() {
+	constructor() {
+		super();
+
 		this.options = {
 			outputDirName: 'html',
 			thumbsDirName: '_thumbs',
@@ -99,42 +99,75 @@ class CLI extends BaseApplication {
 		}
 
 		this.cache = new Cache(this.options);
+		this.progress = new Progress();
 
 		this.files = new Files(
 			this.options,
-			this.dataProgressCallback.bind(this),
+			this.setProgressCallback.bind(this),
 			this.cache
 		);
 
 		this.template = new Template(
 			this.options,
-			this.dataProgressCallback.bind(this)
+			this.setProgressCallback.bind(this)
 		);
 
 		this.thumbnails = new Thumbnails(
 			this.options,
-			this.dataProgressCallback.bind(this),
+			this.setProgressCallback.bind(this),
 			this.cache
 		);
+	}
+
+	init() {
+		this.write(chalk.yellow(logo));
+		this.write('');
 
 		this.prepareOutputDir();
 
 		this.write(chalk.blue('Finding files...'));
+		this.progress.start();
 
 		this.files.find(
 			this.options.src
 		)
 			.then((files) => {
-				this.write(`${chalk.green(this.getFileCount(files))} file(s) found.`);
+				this.progress.done();
+
+				this.write(`${chalk.green(this.getFileCount(files))} file(s) found.\n`);
+				this.write(chalk.blue('Generating thumbnails...'));
+
+				this.progress.start();
 				return this.thumbnails.generate(files);
 			})
-			.then(this.template.build)
+			.then((files) => {
+				this.progress.done();
+
+				this.write(
+					`${chalk.green(this.thumbnails.taskCounts.complete)} thumbnail(s) generated ` +
+					`(${chalk.green(this.thumbnails.taskCounts.cached)} thumbnail(s) cached).\n`
+				);
+
+				this.write(chalk.blue('Building templates...'));
+				this.progress.start();
+				return this.template.build(files);
+			})
 			.then(() => {
-				this.cache.save();
+				this.progress.done();
+
+				this.write(
+					`${chalk.green(this.template.taskCounts.complete)} template(s) generated.\n`
+				);
+
+				return this.cache.save();
 			})
 			.then(() => {
 				this.write(chalk.green('Done!'));
 				process.exit();
+			})
+			.catch((error) => {
+				this.progress.clear();
+				this.writeError(error);
 			});
 	}
 
@@ -153,19 +186,9 @@ class CLI extends BaseApplication {
 		}
 	}
 
-	dataProgressCallback(message, data) {
-		if (this.options.verbose) {
-			if (data instanceof BaseFile) {
-				this.write(`${message}: ${chalk.yellow(data.filename)}`);
-			} else {
-				this.stringProgressCallback(message, data);
-			}
-		}
-	}
-
-	stringProgressCallback(message, data) {
-		if (this.options.verbose) {
-			this.write(`${message}: ${chalk.yellow(data)}`);
+	setProgressCallback(item, percentage) {
+		if (!this.options.silent) {
+			this.progress.set(item, percentage || null);
 		}
 	}
 
@@ -192,22 +215,6 @@ class CLI extends BaseApplication {
 
 		const usage = commandLineUsage(sections)
 		this.write(usage);
-	}
-
-	/**
-	 * Counts all the files within an array.
-	 * @param {Array} files - Files to count.
-	 */
-	getFileCount(files) {
-		return files.reduce((count, file) => {
-			count += 1;
-
-			if (file instanceof Directory) {
-				count += this.getFileCount(file.children);
-			}
-
-			return count;
-		}, 0);
 	}
 }
 
