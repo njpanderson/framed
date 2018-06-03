@@ -16,9 +16,11 @@ class Progress {
 		this.precision = 0;
 		this.frame = 0;
 		this.item = '';
+		this.running = false;
 	}
 
 	start(item = '', percentage = null) {
+		this.running = true;
 		this.set(item, percentage);
 
 		this.interval = setInterval(this.update.bind(this), 80);
@@ -39,6 +41,10 @@ class Progress {
 	update() {
 		const size = windowSize.get(),
 			pads = ('').padEnd(this.ui.padding, ' ');
+
+		if (!this.running) {
+			return;
+		}
 
 		let frame = '',
 			status = '',
@@ -95,6 +101,7 @@ class Progress {
 
 	clear() {
 		clearInterval(this.interval);
+		this.running = false;
 		logUpdate.clear();
 	}
 
@@ -105,6 +112,7 @@ class Progress {
 			this.set('Complete', 100);
 		}
 
+		this.running = false;
 		logUpdate.done();
 	}
 }

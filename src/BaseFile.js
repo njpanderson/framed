@@ -13,6 +13,7 @@ class BaseFile {
 		this.basename = path.basename(file);
 		this.hash = hash.digest('hex');
 		this.mtimeMs = stat.mtimeMs;
+		this.valid = true;
 	}
 }
 

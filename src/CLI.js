@@ -70,8 +70,8 @@ class CLI extends BaseApplication {
 			name: 'template',
 			type: String,
 			alias: 't',
-			defaultValue: `${__dirname}${path.sep}templates${path.sep}basic`,
-			description: 'Defines a path for the gallery template.'
+			defaultValue: `njp-framed-basic`,
+			description: 'Defines a node module ID for the gallery template.'
 		}, {
 			name: 'verbose',
 			type: Boolean,
@@ -187,6 +187,7 @@ class CLI extends BaseApplication {
 	}
 
 	setProgressCallback(item, percentage) {
+		// console.log('pc', item, percentage);
 		if (!this.options.silent) {
 			this.progress.set(item, percentage || null);
 		}

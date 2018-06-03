@@ -3,7 +3,6 @@ const path = require('path');
 const util = require('util');
 const chalk = require('chalk');
 const Handlebars = require('handlebars');
-const rollup = require('rollup');
 
 const File = require('../File');
 const Directory = require('../Directory');
@@ -16,8 +15,9 @@ class Template extends BaseApplication {
 		this.compile = this.compile.bind(this);
 		this.build = this.build.bind(this);
 		this.manifest = {};
+		this.template = null;
 
-		this.validateTemplate();
+		this.validateAndIncludeTemplate();
 	}
 
 	build(files) {
@@ -26,31 +26,25 @@ class Template extends BaseApplication {
 
 		// Return the promise
 		return new Promise((resolve, reject) => {
-			let rollupConfigFile = this.options.template + path.sep + 'rollup.config.js',
-				jsFilename = 'bundle.js',
-				config, compiler;
+			let jsFilename = 'bundle.js',
+				config, compiler, cwd;
 
-			if (fs.existsSync(rollupConfigFile)) {
-				config = require(rollupConfigFile)(this.options);
+			if (this.template.builder) {
+				// Save and change working directory to the template
+				cwd = process.cwd();
+				process.chdir(this.template.root);
 
-				// Override config
-				if (typeof config.inputOptions.input === 'string') {
-					config.inputOptions.input = path.resolve(
-						this.options.template + path.sep + config.inputOptions.input
-					);
-				}
+				this.template.builder(
+					this.options,
+					this.options.output + path.sep + jsFilename
+				).then((manifest) => {
+					// Reset working directory
+					process.chdir(cwd);
 
-				config.outputOptions = Object.assign(config.outputOptions, {
-					file: this.options.output + path.sep + jsFilename
-				});
-
-				this.manifest.script = jsFilename;
-
-				rollup.rollup(config.inputOptions)
-					.then((bundle) => bundle.write(config.outputOptions))
-					.then(() => this.compile(files))
-					.then(resolve)
-					.catch(reject);
+					// Add result object to manifest
+					this.manifest = Object.assign(this.manifest, manifest);
+					this.compile(files).then(resolve);
+				}, reject);
 			} else {
 				this.compile(files)
 					.then(resolve)
@@ -59,7 +53,7 @@ class Template extends BaseApplication {
 		});
 	}
 
-	compile(files, parent) {
+	compile(files, parent, depth = 0) {
 		let data = {
 				"items": []
 			},
@@ -75,7 +69,7 @@ class Template extends BaseApplication {
 
 		files.forEach((file) => {
 			if (file instanceof File) {
-				// Add files to a template list
+				// Add files to the dataset
 				data.items.push(new Item(
 					'file',
 					file.href || this.makeRelative(file.filename),
@@ -84,6 +78,7 @@ class Template extends BaseApplication {
 					file.mimeType
 				));
 			} else if (file instanceof Directory) {
+				// Add directories to the dataset
 				data.items.push(new Item(
 					'dir',
 					file.templateFilename,
@@ -91,30 +86,32 @@ class Template extends BaseApplication {
 					this.getRandomSubarray(this.getThumb(file), 10)
 				));
 
-				// Go compile sub directories
-				tasks.concat(this.compile(file.children, file));
+				// Add compilation tasks for directories
+				tasks = tasks.concat(this.compile(file.children, file, (depth + 1)));
 			}
 		});
 
-		tasks.push(new Promise((resolve, reject) => {
-			template = Handlebars.compile(fs.readFileSync(
-				`${this.options.template}${path.sep}index.html`, {
-					encoding: 'UTF-8'
-				}
-			));
+		tasks.push(() => {
+			return new Promise((resolve, reject) => {
+				template = Handlebars.compile(fs.readFileSync(
+					`${this.template.root}${path.sep}index.html`, {
+						encoding: 'UTF-8'
+					}
+				));
 
-			data.title = parent.basename;
-			data.script = this.manifest.script;
+				data.title = parent.basename;
+				data.script = this.manifest.script;
 
-			this.save(
-				template(this.sortData(data)),
-				parent.templateFilename
-			);
+				this.save(
+					template(this.sortData(data)),
+					parent.templateFilename
+				);
 
-			resolve();
-		}));
+				resolve();
+			});
+		});
 
-		if (!parent) {
+		if (depth === 0) {
 			return this.runTasksInSerial(tasks);
 		} else {
 			return tasks;
@@ -180,20 +177,27 @@ class Template extends BaseApplication {
 		});
 	}
 
-	validateTemplate() {
+	validateAndIncludeTemplate() {
 		const templateFiles = [
 			'index.html'
 		];
 
-		if (!fs.existsSync(`${this.options.template}`)) {
-			throw new Error(`Template path "${this.options.template}" not found`);
+		let template;
+
+		// Attempt to require the template
+		this.template = require(this.options.template);
+
+		if (this.template.builder && typeof this.template.builder !== 'function') {
+			throw new Error(`Template builder defined but not a function.`);
 		}
 
-		templateFiles.forEach((file) => {
-			if (!fs.existsSync(`${this.options.template}${path.sep}${file}`)) {
-				throw new Error(`Template file "${file}" not found within template path`);
+		for (template in this.template.templates) {
+			if (!fs.existsSync(
+				`${this.template.root}${path.sep}${this.template.templates[template]}`
+			)) {
+				throw new Error(`Template file "${template}" (${this.template.templates[template]}) not found within template path`);
 			}
-		});
+		}
 	}
 }
 

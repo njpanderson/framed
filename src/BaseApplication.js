@@ -37,7 +37,7 @@ class BaseApplication {
 	}
 
 	incrementProgress(item) {
-		let percentage = (100/this.taskCounts.count) * this.taskCounts.complete++;
+		let percentage = (100/this.taskCounts.count) * ++this.taskCounts.complete;
 		this.setProgress(item, percentage);
 	}
 
@@ -72,18 +72,22 @@ class BaseApplication {
 	}
 
 	runTasksInSerial(tasks) {
+		// console.log(`About to run ${tasks.length} task(s)...`);
 		return new Promise((resolve, reject) => {
 			let results = [];
 
 			const runner = function() {
 				if (tasks.length) {
+					// console.log(`${tasks.length} remaining...`);
 					(tasks.shift()).call(this)
 						.then((result) => {
 							results.push(result);
 							runner();
+							// setTimeout(runner, 500);
 						})
 						.catch(reject)
 				} else {
+					// console.log(`No tasks left! Resolving...`);
 					resolve(results);
 				}
 			};

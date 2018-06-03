@@ -38,7 +38,10 @@ class Files extends BaseApplication {
 				this.taskCounts.count = files.length;
 
 				// Then, run the parser
-				this.parse(root, glob.cache).then(resolve, reject);
+				this.parse(root, glob.cache).then((results) => {
+					// console.log('find resolve');
+					return results;
+				}).then(resolve, reject);
 			});
 		});
 	}
@@ -61,7 +64,7 @@ class Files extends BaseApplication {
 					let stat = fs.statSync(file);
 
 					if (stat.isDirectory()) {
-						tasks.push(() => this.parse(file).then(subResult =>
+						tasks.push(() => this.parse(file, globCache).then(subResult =>
 							result.push(new Directory(file, subResult))
 						));
 					} else {
@@ -83,6 +86,7 @@ class Files extends BaseApplication {
 
 				this.runTasksInSerial(tasks)
 					.then(() => {
+						// console.log('task resolve');
 						resolve(result)
 					});
 			});

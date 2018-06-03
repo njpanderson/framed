@@ -105,10 +105,11 @@ class Thumbnails extends BaseApplication {
 						break;
 
 					default:
-						this.writeError(
-							`Format ${file.mimeType} not supported. ` +
-							`Thumb for ${file.filename} not generated.`
-						);
+						file.valid = false;
+						// this.writeError(
+						// 	`Format ${file.mimeType} not supported. ` +
+						// 	`Thumb for ${file.filename} not generated.`
+						// );
 				}
 			} else if (file instanceof Directory) {
 				tasks = tasks.concat(
