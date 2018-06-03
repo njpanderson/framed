@@ -33,11 +33,18 @@ class BaseApplication {
 	 * @param {boolean} [newline = true] - Whether to enter a newline character at the end.
 	 */
 	write(message, newline = true) {
-		process.stdout.write(message + (newline ? os.EOL : '\0'));
+		if (!this.options.silent) {
+			process.stdout.write(message + (newline ? os.EOL : '\0'));
+		}
 	}
 
 	incrementProgress(item) {
 		let percentage = (100/this.taskCounts.count) * ++this.taskCounts.complete;
+
+		if (this.options.verbose) {
+			this.write(`${item}`);
+		}
+
 		this.setProgress(item, percentage);
 	}
 

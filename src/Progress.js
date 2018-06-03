@@ -8,7 +8,7 @@ class Progress {
 			left: '[',
 			right: ']',
 			frames: ['▮', '▯', ['-', '\\', '|', '/']],
-			padding: 2
+			padding: 1
 		};
 
 		this.interval = null;

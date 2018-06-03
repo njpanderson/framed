@@ -17,6 +17,35 @@ class CLI extends BaseApplication {
 	constructor() {
 		super();
 
+		this.getOptions();
+
+		if (this.options.help) {
+			this.writeUsage();
+			process.exit();
+		}
+
+		this.cache = new Cache(this.options);
+		this.progress = new Progress(this.options);
+
+		this.files = new Files(
+			this.options,
+			this.setProgressCallback.bind(this),
+			this.cache
+		);
+
+		this.template = new Template(
+			this.options,
+			this.setProgressCallback.bind(this)
+		);
+
+		this.thumbnails = new Thumbnails(
+			this.options,
+			this.setProgressCallback.bind(this),
+			this.cache
+		);
+	}
+
+	getOptions() {
 		this.options = {
 			outputDirName: 'html',
 			thumbsDirName: '_thumbs',
@@ -26,6 +55,13 @@ class CLI extends BaseApplication {
 		};
 
 		this.optionDefs = [{
+			name: 'src',
+			type: String,
+			defaultOption: true,
+			defaultValue: process.cwd(),
+			typeLabel: '{underline path}',
+			description: 'The source directory to scan for content.'
+		}, {
 			name: 'help',
 			type: Boolean,
 			description: 'Displays this help.'
@@ -37,13 +73,6 @@ class CLI extends BaseApplication {
 			typeLabel: '{underline path}',
 			description: 'An output directory to store the gallery HTML.'
 		}, {
-			name: 'src',
-			type: String,
-			defaultOption: true,
-			defaultValue: process.cwd(),
-			typeLabel: '{underline path}',
-			description: 'The source directory to scan for content.'
-		}, {
 			name: 'copy-files',
 			type: Boolean,
 			defaultValue: false,
@@ -53,7 +82,7 @@ class CLI extends BaseApplication {
 			name: 'run-js',
 			type: String,
 			defaultValue: '',
-			description: 'Run a JS script on each file during collection.'
+			description: 'Run a JS script on each file during collection. (Implies -c).'
 		}, {
 			name: 'width',
 			type: Number,
@@ -77,7 +106,13 @@ class CLI extends BaseApplication {
 			type: Boolean,
 			alias: 'v',
 			defaultValue: false,
-			description: 'Produces more output data.'
+			description: 'Produces more output data (and disables progress bars).'
+		}, {
+			name: 'silent',
+			type: Boolean,
+			alias: 's',
+			defaultValue: false,
+			description: 'Supresses all output except for errors. (Disables -v).'
 		}];
 
 		this.options = Object.assign(this.options, commandLineArgs(this.optionDefs, {
@@ -93,69 +128,45 @@ class CLI extends BaseApplication {
 		this.options.fullDir = `${this.options.output}${path.sep}${this.options.fullDirName}`;
 		this.options.cacheFile = `${this.options.output}${path.sep}${this.options.cacheFile}`;
 
-		if (this.options.help) {
-			this.printUsage();
-			process.exit();
+		// Set implied options
+		if (this.options.runJs) {
+			this.options.copyFiles = true;
 		}
 
-		this.cache = new Cache(this.options);
-		this.progress = new Progress();
-
-		this.files = new Files(
-			this.options,
-			this.setProgressCallback.bind(this),
-			this.cache
-		);
-
-		this.template = new Template(
-			this.options,
-			this.setProgressCallback.bind(this)
-		);
-
-		this.thumbnails = new Thumbnails(
-			this.options,
-			this.setProgressCallback.bind(this),
-			this.cache
-		);
+		if (this.options.silent) {
+			this.options.verbose = false;
+		}
 	}
 
 	init() {
-		this.write(chalk.yellow(logo));
-		this.write('');
-
+		this.writeIntro();
 		this.prepareOutputDir();
 
-		this.write(chalk.blue('Finding files...'));
-		this.progress.start();
+		// Step 1 - Find files
+		this.startProgress(chalk.blue('Finding files...'));
 
 		this.files.find(
 			this.options.src
 		)
 			.then((files) => {
-				this.progress.done();
+				this.doneProgress(`${chalk.green(this.getFileCount(files))} file(s) found.\n`);
 
-				this.write(`${chalk.green(this.getFileCount(files))} file(s) found.\n`);
-				this.write(chalk.blue('Generating thumbnails...'));
-
-				this.progress.start();
+				// Step 2 - Generate thumbnails
+				this.startProgress(chalk.blue('Generating thumbnails...'));
 				return this.thumbnails.generate(files);
 			})
 			.then((files) => {
-				this.progress.done();
-
-				this.write(
+				this.doneProgress(
 					`${chalk.green(this.thumbnails.taskCounts.complete)} thumbnail(s) generated ` +
 					`(${chalk.green(this.thumbnails.taskCounts.cached)} thumbnail(s) cached).\n`
 				);
 
-				this.write(chalk.blue('Building templates...'));
-				this.progress.start();
+				// Step 3 - Build templates
+				this.startProgress(chalk.blue('Building templates...'));
 				return this.template.build(files);
 			})
 			.then(() => {
-				this.progress.done();
-
-				this.write(
+				this.doneProgress(
 					`${chalk.green(this.template.taskCounts.complete)} template(s) generated.\n`
 				);
 
@@ -186,6 +197,22 @@ class CLI extends BaseApplication {
 		}
 	}
 
+	startProgress(message) {
+		message && this.write(message);
+
+		if (!this.options.silent && !this.options.verbose) {
+			this.progress.start();
+		}
+	}
+
+	doneProgress(message) {
+		if (!this.options.silent && !this.options.verbose) {
+			this.progress.done();
+		}
+
+		message && this.write(message);
+	}
+
 	setProgressCallback(item, percentage) {
 		// console.log('pc', item, percentage);
 		if (!this.options.silent) {
@@ -193,7 +220,26 @@ class CLI extends BaseApplication {
 		}
 	}
 
-	printUsage() {
+	writeIntro() {
+		this.write(chalk.yellow(logo));
+		this.write('');
+
+		this.write(chalk.blue('Your settings:'));
+		this.write(` Source: ${chalk.yellow(this.options.src)}`);
+		this.write(` Output: ${chalk.yellow(this.options.output)}`);
+
+		if (this.options.copyFiles) {
+			if (this.options.runJs) {
+				this.write(` ${chalk.yellow(this.options.runJs)} will be run on each file.`);
+			} else {
+				this.write(` Each file will be copied to the output folder.`);
+			}
+		}
+
+		this.write('');
+	}
+
+	writeUsage() {
 		const sections = [{
 			content: chalk.yellow(logo),
 			raw: true
