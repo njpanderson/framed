@@ -25,7 +25,7 @@
     "log-update": "^2.3.0",
     "mime-types": "^2.1.18",
     "njp-framed-basic": "git://github.com/njpanderson/framed-basic.git#master",
-    "sharp": "^0.20.2",
+    "sharp": "^0.20.4",
     "window-size": "^1.1.0"
   },
   "devDependencies": {
