@@ -1,8 +1,6 @@
 const Glob = require('glob').Glob;
 const fs = require('fs');
 const path = require('path');
-const util = require('util');
-const chalk = require('chalk');
 
 const File = require('./File');
 const Directory = require('./Directory');
@@ -16,16 +14,17 @@ class Files extends BaseApplication {
 			dot: false
 		};
 
-		if (this.options.runJs) {
-			// Get JS script from include
-			this.jsRunner = require(path.resolve(this.options.runJs));
-		}
-
 		this.cache = cache;
 		this.progressCallback = progressCallback;
 	}
 
 	find(root) {
+		// Attach jsRunner
+		if (this.options.runJs && !this.jsRunner) {
+			// Get JS script from include
+			this.jsRunner = require(path.resolve(this.options.runJs));
+		}
+
 		// Find a list all files and get a count
 		return new Promise((resolve, reject) => {
 			let glob = new Glob(`${root}/**/*`, Object.assign({}, this.globOptions, {
@@ -76,6 +75,7 @@ class Files extends BaseApplication {
 										this.incrementProgress(file.filename);
 										result.push(file);
 									})
+									.catch(this.writeError.bind(this))
 							});
 						} else {
 							this.incrementProgress(file);
@@ -88,6 +88,9 @@ class Files extends BaseApplication {
 					.then(() => {
 						// console.log('task resolve');
 						resolve(result)
+					})
+					.catch((error) => {
+						this.writeError(error);
 					});
 			});
 		});

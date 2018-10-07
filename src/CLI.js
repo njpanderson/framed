@@ -1,5 +1,4 @@
 const fs = require('fs');
-const util = require('util');
 const path = require('path');
 const chalk = require('chalk');
 const commandLineArgs = require('command-line-args');
@@ -138,9 +137,36 @@ class CLI extends BaseApplication {
 		}
 	}
 
+	validate() {
+		// Check things
+		if (this.options.runJs && !fs.existsSync(path.resolve(this.options.runJs))) {
+			this.writeError(`JS file ${this.options.runJs} for --run-js option not found.`);
+			return false;
+		}
+
+		if (this.options.src && !fs.existsSync(path.resolve(this.options.src))) {
+			this.writeError(`Source path ${this.options.src} not found.`);
+			return false;
+		}
+
+		if (!this.options || !this.options.output) {
+			this.writeError('Output directory not defined');
+			return false;
+		}
+
+		return true;
+	}
+
 	init() {
+		let errors = [];
+
 		this.writeIntro();
-		this.prepareOutputDir();
+
+		if (!this.validate() || !this.prepareOutputDir()) {
+			return false;
+		}
+
+		this.writeSettings();
 
 		// Step 1 - Find files
 		this.startProgress(chalk.blue('Finding files...'));
@@ -173,7 +199,24 @@ class CLI extends BaseApplication {
 				return this.cache.save();
 			})
 			.then(() => {
-				this.write(chalk.green('Done!'));
+				// concatenate errors
+				errors = errors.concat(
+					this.files.errorsLogged,
+					this.thumbnails.errorsLogged,
+					this.template.errorsLogged
+				);
+
+				if (errors.length) {
+					this.write(chalk.yellow(`Done, with ${errors.length} Error(s) logged:`));
+
+					errors.forEach((error) => {
+						this.writeError(error.message);
+					});
+				} else {
+					this.write(chalk.green('Done!'));
+				}
+
+
 				process.exit();
 			})
 			.catch((error) => {
@@ -183,18 +226,18 @@ class CLI extends BaseApplication {
 	}
 
 	prepareOutputDir() {
-		if (!this.options || !this.options.output) {
-			this.writeError('Output directory not defined');
-		}
-
 		// Attempt to create output directory
 		try {
 			if (!fs.existsSync(this.options.output)) {
 				fs.mkdirSync(this.options.output);
 			}
+
+			return true;
 		} catch (e) {
 			this.writeError(`Could not create output directory: ${e.message}`);
 		}
+
+		return false;
 	}
 
 	startProgress(message) {
@@ -223,7 +266,9 @@ class CLI extends BaseApplication {
 	writeIntro() {
 		this.write(chalk.yellow(logo));
 		this.write('');
+	}
 
+	writeSettings() {
 		this.write(chalk.blue('Your settings:'));
 		this.write(` Source: ${chalk.yellow(this.options.src)}`);
 		this.write(` Output: ${chalk.yellow(this.options.output)}`);

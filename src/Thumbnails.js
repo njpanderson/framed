@@ -1,7 +1,5 @@
 const fs = require('fs');
-const util = require('util');
 const path = require('path');
-const chalk = require('chalk');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 
@@ -40,6 +38,7 @@ class Thumbnails extends BaseApplication {
 				switch (file.mimeType) {
 					case 'image/jpeg':
 					case 'image/png':
+					case 'image/gif':
 						outputFile = this.getOutputFile(
 							file,
 							this.options.thumbsDir + path.sep +
@@ -58,7 +57,8 @@ class Thumbnails extends BaseApplication {
 
 									return file;
 								})
-								.catch(() => {
+								.catch((error) => {
+									this.logError(error, file);
 									this.incrementProgress(file.filename);
 								});
 							});
@@ -92,7 +92,8 @@ class Thumbnails extends BaseApplication {
 
 									return file;
 								})
-								.catch(() => {
+								.catch((error) => {
+									this.logError(error, file);
 									this.incrementProgress(file.filename);
 								})
 							});

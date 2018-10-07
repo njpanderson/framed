@@ -27,7 +27,7 @@ class Template extends BaseApplication {
 		// Return the promise
 		return new Promise((resolve, reject) => {
 			let jsFilename = 'bundle.js',
-				config, compiler, cwd;
+				cwd;
 
 			if (this.template.builder) {
 				// Save and change working directory to the template
@@ -92,7 +92,7 @@ class Template extends BaseApplication {
 		});
 
 		tasks.push(() => {
-			return new Promise((resolve, reject) => {
+			return new Promise((resolve) => {
 				template = Handlebars.compile(fs.readFileSync(
 					`${this.template.root}${path.sep}index.html`, {
 						encoding: 'UTF-8'
@@ -178,10 +178,6 @@ class Template extends BaseApplication {
 	}
 
 	validateAndIncludeTemplate() {
-		const templateFiles = [
-			'index.html'
-		];
-
 		let template;
 
 		// Attempt to require the template

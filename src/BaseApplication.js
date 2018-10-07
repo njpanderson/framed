@@ -8,11 +8,25 @@ class BaseApplication {
 	constructor(options, progressCallback = null) {
 		this.options = options;
 		this.progressCallback = progressCallback;
+		this.errorsLogged = [];
 
 		this.taskCounts = {
 			count: 0,
 			complete: 0
 		};
+	}
+
+	logError(error, file) {
+		let errorMessage;
+
+		errorMessage = (error instanceof Error) ? Error.message : error;
+
+		this.errorsLogged.push({
+			originalError: error,
+			file: file,
+			message: errorMessage +
+				(file ? ` (${file.filename})` : '')
+		});
 	}
 
 	writeError(error) {
@@ -22,8 +36,10 @@ class BaseApplication {
 			error.code &&this.write(`${chalk.red('Code:')}: ${error.code}`);
 			error.frame &&this.write(`${chalk.red('Frame:')}: ${error.frame}`);
 			error.stack &&this.write(`${chalk.red('Stack trace:')}:\n${error.stack}`);
+			process.exitCode = error.code;
 		} else {
 			this.write(chalk.red('Error:') + ' ' + error);
+			process.exitCode = 1;
 		}
 	}
 
